@@ -139,6 +139,7 @@ static struct android_dev *_android_dev;
 static struct switch_dev usb_connected_sw = { .name = "usb_connected" };
 static struct switch_dev usb_config_sw = { .name = "usb_configuration" };
 static struct switch_dev usb_hwconnected_sw = { .name = "usb_hwconnected" };
+static void legacy_notify(void);
 static int legacy_switches;
 static int android_bind_config(struct usb_configuration *c);
 static void android_unbind_config(struct usb_configuration *c);
@@ -270,6 +271,8 @@ static void android_work(struct work_struct *data)
 		switch_set_state(&usb_hwconnected_sw, is_hwconnected);
 		switch_set_state(&usb_connected_sw, sw_on);
 		switch_set_state(&usb_config_sw, sw_cfg);
+		/* MountService only learns usb_mass_storage from this uevent. */
+		legacy_notify();
 	}
 
 	if (uevent_envp) {
@@ -1215,6 +1218,8 @@ struct mass_storage_function_config {
 	struct fsg_common *common;
 };
 
+static void y220_ums_publish(struct fsg_common *common);
+
 static int mass_storage_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
 {
@@ -1239,6 +1244,10 @@ static int mass_storage_function_init(struct android_usb_function *f,
 #endif
 
 	config->fsg.nluns = NLUN_STORAGE;
+	/* Stock vold writes lun0 and lun1. A shared-sdcard build
+	 * only creates lun0, so the second share has nowhere to go. */
+	if (config->fsg.nluns < 2)
+		config->fsg.nluns = 2;
 
 	for(i = 0; i < config->fsg.nluns; i++) {
 		config->fsg.luns[i].removable = 1;
@@ -1282,7 +1291,32 @@ static int mass_storage_function_init(struct android_usb_function *f,
 
 	config->common = common;
 	f->config = config;
+	y220_ums_publish(common);
 	return 0;
+}
+
+/* Gingerbread vold opens these paths, not the android_usb function dir. */
+static struct platform_device *y220_ums_pdev;
+
+static void y220_ums_publish(struct fsg_common *common)
+{
+	int i;
+
+	y220_ums_pdev = platform_device_register_simple("usb_mass_storage",
+							-1, NULL, 0);
+	if (IS_ERR(y220_ums_pdev)) {
+		pr_err("android_usb: usb_mass_storage platform failed\n");
+		y220_ums_pdev = NULL;
+		return;
+	}
+	for (i = 0; i < common->nluns && i < 2; i++) {
+		char name[8];
+
+		snprintf(name, sizeof(name), "lun%d", i);
+		if (sysfs_create_link(&y220_ums_pdev->dev.kobj,
+				      &common->luns[i].dev.kobj, name))
+			pr_err("android_usb: %s link failed\n", name);
+	}
 }
 
 static void mass_storage_function_cleanup(struct android_usb_function *f)
@@ -2084,30 +2118,45 @@ static struct legacy_func legacy_funcs[] = {
 
 static struct class *legacy_composite_class;
 
-static void legacy_apply_adb(struct android_dev *dev)
+static int legacy_func_on(const char *name)
 {
-	struct legacy_func *adb = NULL;
 	int i;
+
+	for (i = 0; i < ARRAY_SIZE(legacy_funcs); i++) {
+		if (!strcmp(legacy_funcs[i].function_name, name))
+			return legacy_funcs[i].enabled;
+	}
+	return 0;
+}
+
+static void legacy_apply(struct android_dev *dev)
+{
+	static int cur_adb = -1, cur_ums = -1;
+	struct android_usb_function *f, *tmp;
+	int want_adb, want_ums, any = 0;
 
 	if (!dev || !dev->cdev)
 		return;
 
-	for (i = 0; i < ARRAY_SIZE(legacy_funcs); i++) {
-		if (!strcmp(legacy_funcs[i].function_name, "adb")) {
-			adb = &legacy_funcs[i];
-			break;
-		}
-	}
-	if (!adb)
-		return;
-
 	mutex_lock(&dev->mutex);
-	if (adb->enabled && !dev->enabled) {
-		INIT_LIST_HEAD(&dev->enabled_functions);
-		if (android_enable_function(dev, "adb")) {
-			mutex_unlock(&dev->mutex);
-			return;
-		}
+	want_adb = legacy_func_on("adb");
+	want_ums = legacy_func_on("mass_storage");
+	if (want_adb == cur_adb && want_ums == cur_ums)
+		goto out;
+
+	if (dev->enabled) {
+		android_disable(dev);
+		dev->enabled = false;
+	}
+	list_for_each_entry_safe(f, tmp, &dev->enabled_functions, enabled_list)
+		list_del_init(&f->enabled_list);
+
+	if (want_ums && !android_enable_function(dev, "mass_storage"))
+		any = 1;
+	if (want_adb && !android_enable_function(dev, "adb"))
+		any = 1;
+
+	if (any) {
 		device_desc.idVendor = cpu_to_le16(0x12d1);
 		device_desc.idProduct = cpu_to_le16(0x2351);
 		strlcpy(serial_string, "Y220-U05", sizeof(serial_string));
@@ -2120,12 +2169,13 @@ static void legacy_apply_adb(struct android_dev *dev)
 		dev->cdev->desc.iSerialNumber = device_desc.iSerialNumber;
 		android_enable(dev);
 		dev->enabled = true;
-		pr_info("android_usb: legacy adb pullup 12d1:2351\n");
-	} else if (!adb->enabled && dev->enabled) {
-		android_disable(dev);
-		dev->enabled = false;
-		pr_info("android_usb: legacy adb disconnect\n");
+		pr_info("android_usb: legacy adb=%d mass_storage=%d\n",
+			want_adb, want_ums);
 	}
+	cur_adb = want_adb;
+	cur_ums = want_ums;
+	legacy_notify();
+out:
 	mutex_unlock(&dev->mutex);
 }
 
@@ -2146,26 +2196,54 @@ static ssize_t legacy_enable_store(struct device *pdev,
 	if (sscanf(buf, "%d", &value) != 1)
 		return -EINVAL;
 	lf->enabled = !!value;
-	/* Only adb is bound. mass_storage/acm/rndis stay visible so
-	 * vold and UsbService find the nodes, but binding them without
-	 * a LUN drops the whole gadget. */
-	if (!strcmp(lf->function_name, "adb"))
-		legacy_apply_adb(_android_dev);
+	/* acm and rndis stay unbound. Binding them without a tether
+	 * setup drops adb. mass_storage is a real LUN and is bound. */
+	if (!strcmp(lf->function_name, "adb") ||
+	    !strcmp(lf->function_name, "mass_storage"))
+		legacy_apply(_android_dev);
 	return size;
 }
 
+static int legacy_uevent(struct device *dev, struct kobj_uevent_env *env)
+{
+	struct legacy_func *lf = dev_get_drvdata(dev);
+
+	if (add_uevent_var(env, "FUNCTION=%s", lf->sysfs_name))
+		return -ENOMEM;
+	if (add_uevent_var(env, "ENABLED=%d", lf->enabled))
+		return -ENOMEM;
+	return 0;
+}
+
+static struct device_type legacy_dev_type = {
+	.name = "usb_composite_function",
+	.uevent = legacy_uevent,
+};
+
+static void legacy_notify(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(legacy_funcs); i++) {
+		if (legacy_funcs[i].dev)
+			kobject_uevent(&legacy_funcs[i].dev->kobj, KOBJ_CHANGE);
+	}
+}
+
 static struct device_attribute dev_attr_legacy_enable =
-	__ATTR(enable, S_IRUGO | S_IWUSR, legacy_enable_show, legacy_enable_store);
+	__ATTR(enable, S_IRUGO | S_IWUSR | S_IWGRP,
+		legacy_enable_show, legacy_enable_store);
 
 static int adb_enable_open(struct inode *ip, struct file *fp)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(legacy_funcs); i++) {
-		if (!strcmp(legacy_funcs[i].function_name, "adb"))
+		if (!strcmp(legacy_funcs[i].function_name, "adb") ||
+		    !strcmp(legacy_funcs[i].function_name, "mass_storage"))
 			legacy_funcs[i].enabled = 1;
 	}
-	legacy_apply_adb(_android_dev);
+	legacy_apply(_android_dev);
 	return 0;
 }
 
@@ -2207,11 +2285,13 @@ static void legacy_usb_nodes_create(void)
 				legacy_funcs[i].dev = NULL;
 				continue;
 			}
+			legacy_funcs[i].dev->type = &legacy_dev_type;
 			err = device_create_file(legacy_funcs[i].dev,
 					&dev_attr_legacy_enable);
 			if (err)
 				pr_err("android_usb: %s enable failed\n",
 					legacy_funcs[i].sysfs_name);
+			kobject_uevent(&legacy_funcs[i].dev->kobj, KOBJ_CHANGE);
 		}
 	}
 

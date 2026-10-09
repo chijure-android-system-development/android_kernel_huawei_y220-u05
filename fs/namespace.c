@@ -1301,8 +1301,26 @@ static int do_umount(struct mount *mnt, int flags)
 	br_write_lock(vfsmount_lock);
 	event++;
 
-	if (!(flags & MNT_DETACH))
+	if (!(flags & MNT_DETACH)) {
+		struct mount *child;
+
 		shrink_submounts(mnt, &umount_list);
+		/*
+		 * vold moves the primary card to /mnt/secure/staging and
+		 * umounts that path. The second FAT stays mounted on
+		 * staging/sdcard2 and is not MNT_SHRINKABLE, so
+		 * propagate_mount_busy() returns EBUSY and USB share
+		 * aborts. Drop children that have no users of their own.
+		 */
+		while (!list_empty(&mnt->mnt_mounts)) {
+			child = list_first_entry(&mnt->mnt_mounts,
+						 struct mount, mnt_child);
+			if (!list_empty(&child->mnt_mounts) ||
+			    propagate_mount_busy(child, 2))
+				break;
+			umount_tree(child, 1, &umount_list);
+		}
+	}
 
 	retval = -EBUSY;
 	if (flags & MNT_DETACH || !propagate_mount_busy(mnt, 2)) {
