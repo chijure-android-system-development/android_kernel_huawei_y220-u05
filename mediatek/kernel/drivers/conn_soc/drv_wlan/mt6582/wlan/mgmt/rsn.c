@@ -759,6 +759,13 @@ rsnIsSuitableBSS (
 
     DEBUGFUNC("rsnIsSuitableBSS");
 
+    /* cfg80211 stores an nl80211 suite (type in the low byte). Gingerbread
+     * wpa_supplicant uses WEXT and leaves this at 0, so the compare below
+     * rejects every CCMP BSS and association never starts.
+     */
+    if (prAdapter->rWifiVar.rConnSettings.rRsnInfo.u4GroupKeyCipherSuite == 0)
+        return TRUE;
+
     do{
 
         if((prAdapter->rWifiVar.rConnSettings.rRsnInfo.u4GroupKeyCipherSuite & 0x000000FF) != \

@@ -2802,6 +2802,16 @@ wext_set_encode (
     }
     prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+    /* wpa_supplicant issues SIOCSIWENCODE(DISABLED) to drop any WEP key
+     * after SIOCSIWAUTH and before SIOCSIWESSID. Clearing rWpaInfo here
+     * makes the following SSID set look like an open network, so a WPA2
+     * BSS is never selected and authentication times out.
+     */
+    if ((prEnc->flags & IW_ENCODE_MODE) == IW_ENCODE_DISABLED &&
+            prGlueInfo->rWpaInfo.u4WpaVersion != IW_AUTH_WPA_VERSION_DISABLED) {
+        return 0;
+    }
+
     /* reset to default mode */
     prGlueInfo->rWpaInfo.u4WpaVersion = IW_AUTH_WPA_VERSION_DISABLED;
     prGlueInfo->rWpaInfo.u4KeyMgmt = 0;

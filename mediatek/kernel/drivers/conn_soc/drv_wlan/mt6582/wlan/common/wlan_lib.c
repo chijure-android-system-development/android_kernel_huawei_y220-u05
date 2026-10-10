@@ -4792,22 +4792,39 @@ wlanLoadManufactureData (
         prAdapter->fgEnable5GBand = FALSE;
     }
 
-    /* 4. Send EFUSE data */
-#if  defined(MT6628)
-    wlanChangeNvram6620to6628(prRegInfo->aucEFUSE);
-#endif
+    /* 4. Send EFUSE data.
+     * The Y220 WIFI NVRAM has a MAC and TX power, but the 144-byte
+     * efuse override is empty. Sending that block replaces the chip
+     * calibration, so beacons are still received and authentication
+     * never completes. Keep the chip efuse when the override is blank.
+     */
+    {
+        UINT_32 u4Efuse;
+        BOOLEAN fgEfuse = FALSE;
 
-    wlanSendSetQueryCmd(prAdapter,
-            CMD_ID_SET_PHY_PARAM,
-            TRUE,
-            FALSE,
-            FALSE,
-            NULL,
-            NULL,
-            sizeof(CMD_PHY_PARAM_T),
-            (PUINT_8)(prRegInfo->aucEFUSE),
-            NULL,
-            0);
+        for (u4Efuse = 0; u4Efuse < sizeof(prRegInfo->aucEFUSE); u4Efuse++) {
+            if (prRegInfo->aucEFUSE[u4Efuse]) {
+                fgEfuse = TRUE;
+                break;
+            }
+        }
+        if (fgEfuse) {
+#if defined(MT6628)
+            wlanChangeNvram6620to6628(prRegInfo->aucEFUSE);
+#endif
+            wlanSendSetQueryCmd(prAdapter,
+                    CMD_ID_SET_PHY_PARAM,
+                    TRUE,
+                    FALSE,
+                    FALSE,
+                    NULL,
+                    NULL,
+                    sizeof(CMD_PHY_PARAM_T),
+                    (PUINT_8)(prRegInfo->aucEFUSE),
+                    NULL,
+                    0);
+        }
+    }
 
 #if CFG_SUPPORT_RDD_TEST_MODE
     rRddParam.ucRddTestMode = (UINT_8) prRegInfo->u4RddTestMode;
