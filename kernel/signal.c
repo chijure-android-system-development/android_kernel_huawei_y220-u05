@@ -1060,7 +1060,7 @@ static int __send_signal(int sig, struct siginfo *info, struct task_struct *t,
 	int override_rlimit;
 	int ret = 0, result;
 
-    printk(KERN_DEBUG "[%d:%s] sig %d to [%d:%s]\n",current->pid, current->comm, sig, t->pid, t->comm);
+    pr_debug("[%d:%s] sig %d to [%d:%s]\n",current->pid, current->comm, sig, t->pid, t->comm);
 	assert_spin_locked(&t->sighand->siglock);
 
 	result = TRACE_SIGNAL_IGNORED;

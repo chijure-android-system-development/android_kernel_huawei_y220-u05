@@ -46,6 +46,7 @@
 #include <linux/proc_fs.h>
 #include <linux/platform_device.h>
 #include <linux/xlog.h>
+#include <linux/timer.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -80,6 +81,15 @@ char proc_bat_data[32];
 //// Smart Battery Structure
 ///////////////////////////////////////////////////////////////////////////////////////////
 PMU_ChargerStruct BMT_status;
+
+/* Temporary KPOC snapshot: force ipanic just before the observed watchdog. */
+static struct timer_list y220_kpoc_snapshot_timer;
+static kal_bool y220_kpoc_snapshot_armed;
+
+static void y220_kpoc_snapshot(unsigned long unused)
+{
+	panic("Y220-KPOC snapshot 4200ms after first BAT_thread");
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -1047,7 +1057,7 @@ static ssize_t show_FG_Battery_CurrentConsumption(struct device *dev,struct devi
 {
     int ret_value=8888;
     ret_value = battery_meter_get_battery_current();    
-    battery_xlog_printk(BAT_LOG_CRTI, "[EM] FG_Battery_CurrentConsumption : %d/10 mA\n", ret_value);
+    battery_xlog_printk(BAT_LOG_FULL, "[EM] FG_Battery_CurrentConsumption : %d/10 mA\n", ret_value);
     return sprintf(buf, "%u\n", ret_value);
 }
 static ssize_t store_FG_Battery_CurrentConsumption(struct device *dev,struct device_attribute *attr, const char *buf, size_t size)
@@ -1330,7 +1340,7 @@ static void battery_update(struct battery_data *bat_data)
 		}	
     }
 
-	battery_xlog_printk(BAT_LOG_CRTI, "UI_SOC=(%d), resetBatteryMeter=(%d)\n", BMT_status.UI_SOC,resetBatteryMeter);	
+	battery_xlog_printk(BAT_LOG_FULL, "UI_SOC=(%d), resetBatteryMeter=(%d)\n", BMT_status.UI_SOC,resetBatteryMeter);	
 
 	//restore battery UI capacity to rtc
 	if (BMT_status.UI_SOC == 1) {
@@ -1586,7 +1596,7 @@ void mt_battery_GetBatteryData(void)
 
 
 	
-	battery_xlog_printk(BAT_LOG_CRTI, "AvgVbat=(%d),bat_vol=(%d),AvgI=(%d),I=(%d),VChr=(%d),AvgT=(%d),T=(%d),pre_SOC=(%d),SOC=(%d),ZCV=(%d)\n",
+	battery_xlog_printk(BAT_LOG_FULL, "AvgVbat=(%d),bat_vol=(%d),AvgI=(%d),I=(%d),VChr=(%d),AvgT=(%d),T=(%d),pre_SOC=(%d),SOC=(%d),ZCV=(%d)\n",
 		BMT_status.bat_vol,bat_vol,BMT_status.ICharging,ICharging,BMT_status.charger_vol,BMT_status.temperature,temperature,previous_SOC,BMT_status.SOC,BMT_status.ZCV);	
 
 
@@ -1661,7 +1671,7 @@ static PMU_STATUS mt_battery_CheckChargingTime(void)
 
     if( (g_battery_thermal_throttling_flag==2) || (g_battery_thermal_throttling_flag==3) )
     {
-		battery_xlog_printk(BAT_LOG_CRTI, "[TestMode] Disable Safty Timer. bat_tt_enable=%d, bat_thr_test_mode=%d, bat_thr_test_value=%d\n", 
+		battery_xlog_printk(BAT_LOG_FULL, "[TestMode] Disable Safty Timer. bat_tt_enable=%d, bat_thr_test_mode=%d, bat_thr_test_value=%d\n", 
 			g_battery_thermal_throttling_flag, battery_cmd_thermal_test_mode, battery_cmd_thermal_test_mode_value);
 		
     }
@@ -1810,7 +1820,7 @@ static void mt_battery_notify_VBatTemp_check(void)
         g_BatteryNotifyCode &= ~(0x0002);
     }
 
-    battery_xlog_printk(BAT_LOG_CRTI, "[BATTERY] BATTERY_NOTIFY_CASE_0002_VBATTEMP (%x)\n", g_BatteryNotifyCode);
+    battery_xlog_printk(BAT_LOG_FULL, "[BATTERY] BATTERY_NOTIFY_CASE_0002_VBATTEMP (%x)\n", g_BatteryNotifyCode);
         
 #endif
 }
@@ -1829,7 +1839,7 @@ static void mt_battery_notify_VCharger_check(void)
         g_BatteryNotifyCode &= ~(0x0001);
     }
 
-    battery_xlog_printk(BAT_LOG_CRTI, "[BATTERY] BATTERY_NOTIFY_CASE_0001_VCHARGER (%x)\n", g_BatteryNotifyCode);
+    battery_xlog_printk(BAT_LOG_FULL, "[BATTERY] BATTERY_NOTIFY_CASE_0001_VCHARGER (%x)\n", g_BatteryNotifyCode);
 #endif	
 }
 
@@ -1977,7 +1987,7 @@ static void mt_battery_charger_detect_check(void)
 		    }
 		}
 
-		battery_xlog_printk(BAT_LOG_CRTI, "[BAT_thread]Cable in, CHR_Type_num=%d\r\n", BMT_status.charger_type);
+		battery_xlog_printk(BAT_LOG_FULL, "[BAT_thread]Cable in, CHR_Type_num=%d\r\n", BMT_status.charger_type);
 		
     }
     else 
@@ -2088,6 +2098,18 @@ void BAT_thread(void)
    	}
 	
 	mt_battery_update_status();
+
+	if (!y220_kpoc_snapshot_armed &&
+	    (g_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
+	     g_boot_mode == LOW_POWER_OFF_CHARGING_BOOT)) {
+		y220_kpoc_snapshot_armed = KAL_TRUE;
+		init_timer(&y220_kpoc_snapshot_timer);
+		y220_kpoc_snapshot_timer.function = y220_kpoc_snapshot;
+		y220_kpoc_snapshot_timer.expires =
+			jiffies + msecs_to_jiffies(4200);
+		add_timer(&y220_kpoc_snapshot_timer);
+	}
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -2128,7 +2150,7 @@ int bat_thread_kthread(void *x)
 
 void bat_thread_wakeup(void)
 {
-    battery_xlog_printk(BAT_LOG_CRTI, "******** battery : bat_thread_wakeup  ********\n" );
+    battery_xlog_printk(BAT_LOG_FULL, "******** battery : bat_thread_wakeup  ********\n" );
     
     bat_thread_timeout = 1;
     wake_up(&bat_thread_wq);    
@@ -2657,7 +2679,7 @@ static int battery_resume(struct platform_device *dev)
 ///////////////////////////////////////////////////////////////////////////////////////////
 static ssize_t show_BatteryNotify(struct device *dev,struct device_attribute *attr, char *buf)
 {
-    battery_xlog_printk(BAT_LOG_CRTI, "[Battery] show_BatteryNotify : %x\n", g_BatteryNotifyCode);
+    battery_xlog_printk(BAT_LOG_FULL, "[Battery] show_BatteryNotify : %x\n", g_BatteryNotifyCode);
     
     return sprintf(buf, "%u\n", g_BatteryNotifyCode);
 }

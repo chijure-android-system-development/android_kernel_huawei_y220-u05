@@ -1770,7 +1770,7 @@ void dumpTime(writeFunc_enum func, int epnum)
 		diffWrite = tv.tv_sec - writeTime.tv_sec;
 		if(diffWrite > 10)
 		{
-			DBG(0,"[MUSB]Write Operation (%d) seconds\n", diffWrite);
+			DBG(2,"[MUSB]Write Operation (%d) seconds\n", diffWrite);
 			writeTime = tv;
 		}
 	}
@@ -1781,7 +1781,7 @@ void dumpTime(writeFunc_enum func, int epnum)
 		diffInterrupt = tv.tv_sec - interruptTime.tv_sec;
 		if(diffInterrupt > 10)
 		{
-			DBG(0,"[MUSB]Interrupt Operation (%d) seconds\n", diffInterrupt);
+			DBG(2,"[MUSB]Interrupt Operation (%d) seconds\n", diffInterrupt);
 			interruptTime = tv;
 		}
 	}

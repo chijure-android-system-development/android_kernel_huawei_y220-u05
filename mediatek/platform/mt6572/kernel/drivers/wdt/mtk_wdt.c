@@ -289,7 +289,7 @@ int mtk_wdt_get_en_setting(void)
 void mtk_wdt_restart(enum wk_wdt_type type)
 {
 
-  printk("WDT:[mtk_wdt_restart] type  =%d, pid=%d\n",type,current->pid);
+  pr_debug("WDT:[mtk_wdt_restart] type  =%d, pid=%d\n",type,current->pid);
   
 	if(type == WK_WDT_LOC_TYPE)
 	{

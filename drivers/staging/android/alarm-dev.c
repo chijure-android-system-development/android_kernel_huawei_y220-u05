@@ -34,9 +34,7 @@
 #define ANDROID_ALARM_PRINT_IO (1U << 1)
 #define ANDROID_ALARM_PRINT_INT (1U << 2)
 
-static int debug_mask = ANDROID_ALARM_PRINT_INFO | \
-						ANDROID_ALARM_PRINT_IO | \
-						ANDROID_ALARM_PRINT_INT;
+static int debug_mask = 0; /* was INFO|IO|INT: traced every alarm; set via module param to debug */
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 /*
 #define pr_alarm(debug_level_mask, args...) \

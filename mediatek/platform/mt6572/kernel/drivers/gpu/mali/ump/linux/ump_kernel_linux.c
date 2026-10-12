@@ -37,7 +37,7 @@
 
 
 /* Module parameter to control log level */
-int ump_debug_level = 4;
+int ump_debug_level = 1;
 module_param(ump_debug_level, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH); /* rw-rw-r-- */
 MODULE_PARM_DESC(ump_debug_level, "Higher number, more dmesg output");
 

@@ -5,7 +5,7 @@
 #include <mtk_kpd.h>
 
 #define KPD_AUTOTEST	KPD_YES
-#define KPD_DEBUG	KPD_YES
+#define KPD_DEBUG	0	/* was KPD_YES: logged every key press */
 
 struct kpd_ledctl {
 	int onoff;

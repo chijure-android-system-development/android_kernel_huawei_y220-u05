@@ -35,7 +35,7 @@
     size_t disp_drv_dbg_info_log = false;    // info log, default off
     size_t disp_drv_dbg_func_log = false;    // function entry log, default off
     size_t disp_drv_dbg_upd_log = false;    // upd log, default off
-    size_t mtkfb_dbg_log = true;
+    size_t mtkfb_dbg_log = false;   // was true; esd_recovery_kthread spammed every second
     size_t mtkfb_dbg_func_log = false;    // function entry log, default off
 #else
     size_t disp_drv_dbg_log = false;

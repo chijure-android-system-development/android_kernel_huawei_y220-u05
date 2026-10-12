@@ -89,7 +89,7 @@ static INT32 wmt_plat_dump_pin_conf (VOID);
 ********************************************************************************
 */
 UINT32 gCoClockFlag = 0;
-UINT32 gWmtDbgLvl = WMT_LOG_INFO;
+UINT32 gWmtDbgLvl = WMT_LOG_WARN; /* was INFO */
 BGF_IRQ_BALANCE gbgfIrqBle;
 /*******************************************************************************
 *                           P R I V A T E   D A T A

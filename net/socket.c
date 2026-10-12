@@ -1122,7 +1122,7 @@ static int sock_close(struct inode *inode, struct file *filp)
 		return 0;
 	}
 
-	printk(KERN_INFO "socket_close[%lu] \n",inode->i_ino); 
+	pr_debug("socket_close[%lu] \n",inode->i_ino); 
 	
 	sock_release(SOCKET_I(inode));
 	
@@ -1356,9 +1356,9 @@ out:
 	/* It may be already another descriptor 8) Not kernel problem. */
 
 	if((retval >= 0)&& sock && SOCK_INODE(sock) )
-	   printk(KERN_INFO "socket_create[%lu]:fd=%d \n",SOCK_INODE(sock)->i_ino,retval);
+	   pr_debug("socket_create[%lu]:fd=%d \n",SOCK_INODE(sock)->i_ino,retval);
 	 else
-	   printk(KERN_INFO "socket_create:fd=%d \n",retval); 
+	   pr_debug("socket_create:fd=%d \n",retval); 
 	
 	return retval;
 
@@ -1595,9 +1595,9 @@ out_put:
 	fput_light(sock->file, fput_needed);
 out:
       if( (err>=0)&& newsock && SOCK_INODE(newsock) )
-	   printk(KERN_INFO "socket_accept[%lu]:fd=%d \n",SOCK_INODE(newsock)->i_ino,err);
+	   pr_debug("socket_accept[%lu]:fd=%d \n",SOCK_INODE(newsock)->i_ino,err);
 	  else
-	   printk(KERN_INFO "socket_accept:fd=%d \n",err);
+	   pr_debug("socket_accept:fd=%d \n",err);
 	return err;
 out_fd:
 	fput(newfile);

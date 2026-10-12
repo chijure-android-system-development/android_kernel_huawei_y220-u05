@@ -75,8 +75,8 @@
 
 static struct input_dev *kpd_input_dev;
 static bool kpd_suspend = false;
-static int kpd_show_hw_keycode = 1;
-static int kpd_show_register = 1;
+static int kpd_show_hw_keycode = 0;	/* was 1: logged every key press */
+static int kpd_show_register = 0;
 static int kpd_enable_lprst = 1;
 
 /* for AEE manual dump */

@@ -128,7 +128,7 @@ void spm_wdt_restart(void) //used to kick wdt.
 {
     spm_write(SPM_POWER_ON_VAL1,spm_read(SPM_POWER_ON_VAL1)| R7_wdt_kick_p);
     spm_write(SPM_POWER_ON_VAL1,spm_read(SPM_POWER_ON_VAL1)& ~R7_wdt_kick_p);
-		spm_notice("spm_wdt_restart\n");
+		pr_debug("[SPM] spm_wdt_restart\n");
 }
 
 void spm_wdt_config(bool enable)//used to enable/disable spm wdt.

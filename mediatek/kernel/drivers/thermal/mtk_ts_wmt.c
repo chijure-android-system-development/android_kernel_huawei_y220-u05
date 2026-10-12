@@ -379,7 +379,8 @@ static int wmt_thz_get_temp(struct thermal_zone_device *thz_dev,
 
         wmt_tm_dprintk("[wmt_thz_get_temp] temp = %d\n", temp);
 
-        if(temp > 100 || temp < 5)
+        /* temp reads 0 while the WMT chip is idle/off; only warn on overheat (was: > 100 || < 5, logged every second) */
+        if(temp > 100)
             wmt_tm_info("[wmt_thz_get_temp] temp = %d\n", temp);
     }
 

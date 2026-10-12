@@ -257,7 +257,7 @@ int force_get_tbat(void)
         bat_temperature_val = BattVoltToTemp(bat_temperature_volt);        
     }
     
-    bm_print(BM_LOG_CRTI, "[force_get_tbat] %d,%d,%d,%d,%d,%d\n", 
+    bm_print(BM_LOG_FULL, "[force_get_tbat] %d,%d,%d,%d,%d,%d\n", 
         bat_temperature_volt_temp, bat_temperature_volt, fg_current_state, fg_current_temp, fg_r_value, bat_temperature_val);
     
     return bat_temperature_val;    
@@ -1007,11 +1007,11 @@ void oam_init(void)
         oam_v_ocv_1, oam_v_ocv_2, oam_r_1, oam_r_2, oam_d0, oam_i_ori);
 
 	bm_print(BM_LOG_CRTI, "[oam_init_inf] hw_OCV, hw_D0, RTC, D0, oam_OCV_init, tbat\n");
-	bm_print(BM_LOG_CRTI, "[oam_run_inf] oam_OCV1, oam_OCV2, vbat, I1, I2, R1, R2, Car1, Car2, qmax, tbat\n");
-	bm_print(BM_LOG_CRTI, "[oam_result_inf] D1, D2, D3, D4, D5, UI_SOC\n");
+	bm_print(BM_LOG_FULL, "[oam_run_inf] oam_OCV1, oam_OCV2, vbat, I1, I2, R1, R2, Car1, Car2, qmax, tbat\n");
+	bm_print(BM_LOG_FULL, "[oam_result_inf] D1, D2, D3, D4, D5, UI_SOC\n");
 	
 	
-	bm_print(BM_LOG_CRTI, "[oam_init_inf] %d, %d, %d, %d, %d, %d\n",
+	bm_print(BM_LOG_FULL, "[oam_init_inf] %d, %d, %d, %d, %d, %d\n",
 		gFG_voltage, (100 - fgauge_read_capacity_by_v(gFG_voltage)), g_rtc_fg_soc, gFG_DOD0 ,oam_v_ocv_init, force_get_tbat());
  
 }
@@ -1129,7 +1129,7 @@ void oam_run(void)
         d5_count = d5_count + 10;
     }
     
-    bm_print(BM_LOG_CRTI, "[oam_run] %d,%d,%d,%d,%d,%d,%d,%d\n", 
+    bm_print(BM_LOG_FULL, "[oam_run] %d,%d,%d,%d,%d,%d,%d,%d\n", 
         d5_count, d5_count_time, oam_d_3_pre, oam_d_3, oam_d_4_pre, oam_d_4, oam_d_5, charging_current);    
 
     if(oam_run_i == 0)
@@ -1145,7 +1145,7 @@ void oam_run(void)
             gFG_capacity_by_c, gFG_capacity_by_v, gfg_percent_check_point,
             oam_d_1, oam_d_2, oam_d_3, oam_d_4, oam_d_5, gFG_capacity_by_c_init, g_d_hw_ocv);
 
-    bm_print(BM_LOG_CRTI, "[oam_total_s] %d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+    bm_print(BM_LOG_FULL, "[oam_total_s] %d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
         gFG_capacity_by_c,        // 1
         gFG_capacity_by_v,        // 2
         gfg_percent_check_point,  // 3
@@ -1168,10 +1168,10 @@ void oam_run(void)
         (gFG_capacity_by_c - (100-oam_d_5))
         );
 
-	bm_print(BM_LOG_CRTI, "[oam_init_inf] %d, %d, %d, %d, %d, %d\n",
+	bm_print(BM_LOG_FULL, "[oam_init_inf] %d, %d, %d, %d, %d, %d\n",
 		gFG_voltage, (100 - fgauge_read_capacity_by_v(gFG_voltage)), g_rtc_fg_soc, gFG_DOD0 ,oam_v_ocv_init, force_get_tbat());
 
-	 bm_print(BM_LOG_CRTI, "[oam_run_inf] %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", 
+	 bm_print(BM_LOG_FULL, "[oam_run_inf] %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", 
            oam_v_ocv_1,oam_v_ocv_2,vol_bat,oam_i_1,oam_i_2,oam_r_1,oam_r_2,oam_car_1,oam_car_2,gFG_BATT_CAPACITY_aging,force_get_tbat(), oam_d0);  
 
 	  bm_print(BM_LOG_CRTI, "[oam_result_inf] %d, %d, %d, %d, %d, %d\n", 

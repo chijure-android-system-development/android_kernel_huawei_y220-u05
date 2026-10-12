@@ -360,7 +360,7 @@ void select_charging_curret(void)
             g_temp_CC_value = CHARGE_CURRENT_70_00_MA;
         }
 
-		battery_xlog_printk(BAT_LOG_CRTI, "[BATTERY] Default CC mode charging : %d\r\n", g_temp_CC_value);
+		battery_xlog_printk(BAT_LOG_FULL, "[BATTERY] Default CC mode charging : %d\r\n", g_temp_CC_value);
 		
 #if defined(MTK_JEITA_STANDARD_SUPPORT)
 	set_jeita_charging_current();
@@ -501,7 +501,7 @@ static void pchr_turn_on_charging (void)
     }
 
 	/* enable/disable charging */
-	battery_xlog_printk(BAT_LOG_CRTI, "[BATTERY] pchr_turn_on_charging(), enable =%d \r\n", charging_enable);
+	battery_xlog_printk(BAT_LOG_FULL, "[BATTERY] pchr_turn_on_charging(), enable =%d \r\n", charging_enable);
 	battery_charging_control(CHARGING_CMD_ENABLE,&charging_enable);
 
 	
@@ -576,7 +576,7 @@ PMU_STATUS BAT_TopOffModeAction(void)
 {
 	kal_uint32 charging_enable = KAL_FALSE;
 	
-    battery_xlog_printk(BAT_LOG_CRTI, "[BATTERY] Top Off mode charge, timer=%ld on %ld !!\n\r", BMT_status.TOPOFF_charging_time, BMT_status.total_charging_time);    
+    battery_xlog_printk(BAT_LOG_FULL, "[BATTERY] Top Off mode charge, timer=%ld on %ld !!\n\r", BMT_status.TOPOFF_charging_time, BMT_status.total_charging_time);    
 
     BMT_status.PRE_charging_time = 0;
     BMT_status.CC_charging_time = 0;

@@ -125,6 +125,7 @@ extern void pmu_drv_tool_customization_init(void);
 #if defined (MTK_KERNEL_POWER_OFF_CHARGING)
 extern void mt_power_off(void);
 static kal_bool long_pwrkey_press = false;
+static kal_bool pwrkey_press_active = false;
 static unsigned long timer_pre = 0; 
 static unsigned long timer_pos = 0; 
 #define LONG_PWRKEY_PRESS_TIME 		500*1000000    //500ms
@@ -783,7 +784,7 @@ static DECLARE_WAIT_QUEUE_HEAD(pmic_thread_wq);
 
 void wake_up_pmic(void)
 {
-    xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[wake_up_pmic]\r\n");
+    pr_debug("[Power/PMIC] [wake_up_pmic]\r\n");
     pmic_thread_timeout = 1;
     wake_up(&pmic_thread_wq);
     wake_lock(&pmicThread_lock);
@@ -885,11 +886,15 @@ void pwrkey_int_handler(void)
 #if defined (MTK_KERNEL_POWER_OFF_CHARGING)
 		if(g_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT)
 		{
+				if (pwrkey_press_active)
+			{
 				timer_pos = sched_clock();
-				if(timer_pos - timer_pre >= LONG_PWRKEY_PRESS_TIME)
-				{
-					long_pwrkey_press = true;
-				}
+				long_pwrkey_press =
+					(timer_pos - timer_pre >= LONG_PWRKEY_PRESS_TIME);
+				pwrkey_press_active = false;
+			}
+			else
+				long_pwrkey_press = false;
 				xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[pmic_thread_kthread] timer_pos = %ld, timer_pre = %ld, timer_pos-timer_pre = %ld, long_pwrkey_press = %d\r\n",timer_pos, timer_pre, timer_pos-timer_pre, long_pwrkey_press);
 				if(long_pwrkey_press)   //500ms
 				{
@@ -908,6 +913,8 @@ void pwrkey_int_handler(void)
 		if(g_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT)
 		{
 			timer_pre = sched_clock();
+			pwrkey_press_active = true;
+			long_pwrkey_press = false;
 		}
 #endif
         kpd_pwrkey_pmic_handler(0x1);
@@ -1092,11 +1099,11 @@ static int pmic_thread_kthread(void *x)
     while (1) {
         mutex_lock(&pmic_mutex);
 	
-        xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[pmic_thread_kthread] running\n");
+        pr_debug("[Power/PMIC] [pmic_thread_kthread] running\n");
 
         //--------------------------------------------------------------------------------
         ret=pmic_read_interface(INT_STATUS0,(&int_status_val_0),0xFFFF,0x0);
-        xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[INT] int_status_val_0=0x%x\n", int_status_val_0);
+        pr_debug("[Power/PMIC] [INT] int_status_val_0=0x%x\n", int_status_val_0);
 
         if( (((int_status_val_0)&(0x0001))>>0) == 1 )  { spkl_ab_int_handler();      }
         if( (((int_status_val_0)&(0x0002))>>1) == 1 )  { spkl_d_int_handler();      }         
@@ -1113,7 +1120,7 @@ static int pmic_thread_kthread(void *x)
                      
         //--------------------------------------------------------------------------------
         ret=pmic_read_interface(INT_STATUS1,(&int_status_val_1),0xFFFF,0x0);
-        xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[INT] int_status_val_1=0x%x\n", int_status_val_1);
+        pr_debug("[Power/PMIC] [INT] int_status_val_1=0x%x\n", int_status_val_1);
 
         if( (((int_status_val_1)&(0x0001))>>0) == 1 )  { ldo_oc_int_handler();          }
         if( (((int_status_val_1)&(0x0002))>>1) == 1 )  { fchr_key_int_handler();      }
@@ -1133,10 +1140,10 @@ static int pmic_thread_kthread(void *x)
         cust_pmic_interrupt_en_setting();
 
         ret=pmic_read_interface(INT_STATUS0,(&int_status_val_0),0xFFFF,0x0);
-        xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[INT] after ,int_status_val_0=0x%x\n", int_status_val_0);
+        pr_debug("[Power/PMIC] [INT] after ,int_status_val_0=0x%x\n", int_status_val_0);
 
         ret=pmic_read_interface(INT_STATUS1,(&int_status_val_1),0xFFFF,0x0);
-        xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[INT] after ,int_status_val_1=0x%x\n", int_status_val_1);
+        pr_debug("[Power/PMIC] [INT] after ,int_status_val_1=0x%x\n", int_status_val_1);
 
 	
         mutex_unlock(&pmic_mutex);
@@ -1154,7 +1161,7 @@ static int pmic_thread_kthread(void *x)
 
 void mt6323_pmic_eint_irq(void)
 {
-    xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[mt6323_pmic_eint_irq] receive interrupt\n");
+    pr_debug("[Power/PMIC] [mt6323_pmic_eint_irq] receive interrupt\n");
 
     //pmic internal
     wake_up_pmic();

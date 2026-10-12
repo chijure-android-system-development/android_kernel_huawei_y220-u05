@@ -44,10 +44,7 @@
 #define ANDROID_ALARM_PRINT_HIDE (1U << 7)
 
 static int debug_mask = ANDROID_ALARM_PRINT_ERROR | \
-                        ANDROID_ALARM_PRINT_INIT_STATUS | \
-                        ANDROID_ALARM_PRINT_SUSPEND | \
-                        ANDROID_ALARM_PRINT_INT | \
-                        ANDROID_ALARM_PRINT_FLOW;
+                        ANDROID_ALARM_PRINT_INIT_STATUS; /* was also SUSPEND|INT|FLOW */
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 #define pr_alarm(debug_level_mask, fmt, args...) \
