@@ -19,17 +19,18 @@ Toolchain: `arm-linux-androideabi-4.6`.
 
 ## Status
 
-Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#90`, built 12 Oct 2026 and flashed in `boot-y220-k90.img`. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
+Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#91`, built 12 Oct 2026 and flashed in `boot-y220-k91.img`. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
 
 Every module in `/system/lib/modules/` must be built with the running kernel. A TWRP restore of the stock `/system` puts the 2014 modules back; the kernel loads them (same vermagic, no `MODVERSIONS`) and panics in `mtk_stp_wmt`. Keep the stock ones in `/system/lib/modules/ko-2014/`.
 
 ## Changes after #76
 
-Checked on the device with `#90`: modem, SIM, IMEI, calls, SMS, mobile data (Claro needs an APN; the C482 firmware only ships Movistar APNs), WiFi, Bluetooth send and receive, FM radio, loudspeaker, headset with mic detection, voice recorder, camera stills and video with correct colors, deep suspend, zram swap, and power-off charging from the power menu.
+Checked on the device with `#90` and `#91`: modem, SIM, IMEI, calls, SMS, mobile data (Claro needs an APN; the C482 firmware only ships Movistar APNs), WiFi, Bluetooth send and receive, FM radio, loudspeaker, headset with mic detection, voice recorder, camera stills and video with correct colors, deep suspend, zram swap, and power-off charging from the power menu.
 
 - NAND partition table. `partition_define.c` was the donor's eMMC table, so dumchar mapped `/dev/nvram` and friends to nothing and `ccci_plat` failed in `sec_boot_init` opening `/dev/`. It is now the stock NAND layout (18 entries), with MTD names `seccnfg`/`secstatic` and `PART_NUM` 18.
 - zram. `CONFIG_ZSMALLOC` and `CONFIG_ZRAM` are on, and `CONFIG_SLUB_DEBUG_ON` is off, in `mediatek/config/y220/autoconfig/kconfig/project`. The stock `init.rc` creates a 192 MB swap on `zram0`.
 - Kernel log volume went from about 22 lines/s to 1.2 lines/s at idle. Routine per-process, wakelock, battery, keypad, watchdog, PMIC, alarm, WMT and socket messages are `pr_debug` or a higher log level.
+- Boot logo handoff. The LK draws the 16 bpp logo at its own framebuffer base (videolfb ATAG), not at the start of the kernel's 32 bpp VRAM (`0x8fd00000`, 3 MB). `mtkfb_fb_565_to_8888` converted from the VRAM start, so the previous session's last frame showed up garbled between the Movistar logo and the boot animation. It now reads from the LK base.
 - GC0329 colors. The sensor sends Cb Y Cr Y (`0x44=0xa0`, as stock), so the driver declares `SENSOR_OUTPUT_FORMAT_UYVY` (stock `GetInfo` does the same), and `mtkfb` maps the YUV422 overlay layer to `OVL_INPUT_FORMAT_UYVY`.
 
 Open: the camera preview can freeze on a stale frame alternating with black after reopening the camera, switching to video, or stopping a recording. The MDP RDMA stops answering, the CMDQ thread 0 times out waiting for event `0x14`, and MDP resets do not recover it. Stock does not do this.
