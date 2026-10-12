@@ -128,6 +128,7 @@ extern int accdet_irq_handler(void);
 #if defined (MTK_KERNEL_POWER_OFF_CHARGING)
 extern void mt_power_off(void);
 static kal_bool long_pwrkey_press = false;
+static kal_bool pwrkey_press_active = false;
 static unsigned long timer_pre = 0; 
 static unsigned long timer_pos = 0; 
 #define LONG_PWRKEY_PRESS_TIME 		500*1000000    //500ms
@@ -946,10 +947,17 @@ void pwrkey_int_handler(void)
 #if defined (MTK_KERNEL_POWER_OFF_CHARGING)
 		if(g_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT)
 		{
-				timer_pos = sched_clock();
-				if(timer_pos - timer_pre >= LONG_PWRKEY_PRESS_TIME)
+				if(pwrkey_press_active)
 				{
-					long_pwrkey_press = true;
+					timer_pos = sched_clock();
+					long_pwrkey_press =
+						(timer_pos - timer_pre >= LONG_PWRKEY_PRESS_TIME);
+					pwrkey_press_active = false;
+				}
+				else
+				{
+					/* Ignore a release IRQ not preceded by a press. */
+					long_pwrkey_press = false;
 				}
 				xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "[pmic_thread_kthread] timer_pos = %ld, timer_pre = %ld, timer_pos-timer_pre = %ld, long_pwrkey_press = %d\r\n",timer_pos, timer_pre, timer_pos-timer_pre, long_pwrkey_press);
 				if(long_pwrkey_press)   //500ms
@@ -968,6 +976,8 @@ void pwrkey_int_handler(void)
 		if(g_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT)
 		{
 			timer_pre = sched_clock();
+			pwrkey_press_active = true;
+			long_pwrkey_press = false;
 		}
 #endif
         kpd_pwrkey_pmic_handler(0x1);
