@@ -1613,6 +1613,31 @@ static unsigned int mtkfb_get_ovl_mva(unsigned int va, unsigned int size)
     return mva;
 }
 
+/*
+ * Forget cached overlay MVAs for a user buffer. The cache above is keyed by VA,
+ * and the camera HAL reuses the same VAs when the camera is reopened; a stale MVA
+ * still pins the old pages, so the preview showed the previous session's last
+ * frame alternating with black. Called when the buffer is (un)registered.
+ */
+static void mtkfb_drop_ovl_mva(unsigned int va)
+{
+    int i;
+    pid_t tgid = current->tgid;
+
+    for (i = 0; i < 8; i++) {
+        if (mtkfb_ovl_mvas[i].mva &&
+            mtkfb_ovl_mvas[i].tgid == tgid &&
+            (va == 0 || mtkfb_ovl_mvas[i].va == va)) {
+            DISP_WaitForLCDNotBusy();
+            m4u_dealloc_mva(M4U_CLNTMOD_DISP, mtkfb_ovl_mvas[i].va,
+                            mtkfb_ovl_mvas[i].size, mtkfb_ovl_mvas[i].mva);
+            printk("[mtkfb] drop overlay mva 0x%x va 0x%x\n",
+                   mtkfb_ovl_mvas[i].mva, mtkfb_ovl_mvas[i].va);
+            mtkfb_ovl_mvas[i].mva = 0;
+        }
+    }
+}
+
 static int mtkfb_set_overlay_layer(struct fb_info *info, struct fb_overlay_layer* layerInfo)
 {
     struct mtkfb_device *fbdev = (struct mtkfb_device *)info->par;
@@ -2748,7 +2773,16 @@ static int mtkfb_ioctl(struct file *file, struct fb_info *info, unsigned int cmd
 
 		}
 #else
+#if defined(MTKFB_NO_M4U)
+        {
+            struct fb_overlay_buffer_info ob;
+            if (copy_from_user(&ob, (void __user *)arg, sizeof(ob)))
+                return -EFAULT;
+            mtkfb_drop_ovl_mva(ob.src_vir_addr);
+        }
+#else
         MTKFB_WRAN("[FB]: not enable m4u! line:%d \n", __LINE__);
+#endif
 #endif
 		return (r);
     }
@@ -2871,7 +2905,16 @@ static int mtkfb_ioctl(struct file *file, struct fb_info *info, unsigned int cmd
 
 		}
 #else
+#if defined(MTKFB_NO_M4U)
+        {
+            unsigned int va;
+            if (copy_from_user(&va, (void __user *)arg, sizeof(va)))
+                return -EFAULT;
+            mtkfb_drop_ovl_mva(va);
+        }
+#else
         MTKFB_WRAN("[FB]: not enable m4u! line:%d \n", __LINE__);
+#endif
 #endif
 		return (r);
     }
