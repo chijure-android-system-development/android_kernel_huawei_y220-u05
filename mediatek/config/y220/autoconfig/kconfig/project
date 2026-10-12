@@ -49,3 +49,10 @@ CONFIG_MTK_SOUND=y
 # CONFIG_USB_HID is not set
 # CONFIG_USB_KBD is not set
 # CONFIG_USB_MOUSE is not set
+
+# zram swap (stock C482B206 uses a 192MB zram swap from init.rc)
+CONFIG_ZSMALLOC=y
+CONFIG_ZRAM=y
+# CONFIG_ZRAM_DEBUG is not set
+# SLUB debugging on every cache costs RAM/CPU; keep CONFIG_SLUB_DEBUG for stats only
+# CONFIG_SLUB_DEBUG_ON is not set
