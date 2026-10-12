@@ -31,7 +31,7 @@ static struct mtd_partition g_pasStatic_Partition[] = {
 		.size = PART_SIZE_PROTECT_S,
 	},
 	{
-		.name = "seccfg",
+		.name = "seccnfg",
 		.offset = MTDPART_OFS_APPEND,
 		.size = PART_SIZE_SECCFG,
 	},
@@ -52,7 +52,7 @@ static struct mtd_partition g_pasStatic_Partition[] = {
 		.size = PART_SIZE_RECOVERY,
 	},
 	{
-		.name = "sec_ro",
+		.name = "secstatic",
 		.offset = MTDPART_OFS_APPEND,
 		.size = PART_SIZE_SEC_RO,
 		.mask_flags  = MTD_WRITEABLE,

@@ -65,7 +65,7 @@
 #define PART_SIZE_BMTPOOL			(40)
 
 
-#define PART_NUM			20
+#define PART_NUM			18
 
 
 
