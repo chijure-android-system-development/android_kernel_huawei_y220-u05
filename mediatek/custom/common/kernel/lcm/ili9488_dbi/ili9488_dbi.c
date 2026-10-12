@@ -1,4 +1,5 @@
 #include <linux/string.h>
+#include <linux/kernel.h>
 
 #include "lcm_drv.h"
 
@@ -146,24 +147,38 @@ static void lcm_get_params(LCM_PARAMS *params)
 
 static void lcm_init(void)
 {
+	printk(KERN_INFO "[Y220-LCM] init begin\n");
     SET_RESET_PIN(0);
     MDELAY(200);
     SET_RESET_PIN(1);
     MDELAY(400);
 
     init_lcm_registers();
+	printk(KERN_INFO "[Y220-LCM] init end\n");
 }
 
 
 static void lcm_suspend(void)
 {
+	printk(KERN_INFO "[Y220-LCM] suspend begin\n");
+	/* Match the stock Y220 panel power-down sequence. */
 	send_ctrl_cmd(0x28);
+	MDELAY(10);
+	send_ctrl_cmd(0x10);
+	MDELAY(120);
+	printk(KERN_INFO "[Y220-LCM] suspend end\n");
 }
 
 
 static void lcm_resume(void)
 {
+	printk(KERN_INFO "[Y220-LCM] resume begin\n");
+	/* Wake the panel from sleep before enabling display output. */
+	send_ctrl_cmd(0x11);
+	MDELAY(120);
 	send_ctrl_cmd(0x29);
+	MDELAY(120);
+	printk(KERN_INFO "[Y220-LCM] resume end\n");
 }
 
 

@@ -3103,17 +3103,27 @@ BOOL DISP_EsdCheck(void)
 
 BOOL DISP_EsdRecoverCapbility(void)
 {
-    if(!disp_drv_init_context())
+    if(!disp_drv_init_context() || lcm_drv == NULL || lcm_params == NULL)
+    {
+        printk(KERN_ERR "[Y220-DISP] ESD capability skipped: incomplete LCM context\n");
         return FALSE;
+    }
 
-    if((lcm_drv->esd_check && lcm_drv->esd_recover) || (lcm_params->dsi.lcm_ext_te_monitor) || (lcm_params->dsi.lcm_int_te_monitor))
+    if(lcm_drv->esd_check && lcm_drv->esd_recover)
     {
         return TRUE;
     }
-    else
+
+    /* DSI monitor fields are irrelevant for the Y220 parallel DBI panel. */
+    if(lcm_params->type == LCM_TYPE_DSI &&
+       (lcm_params->dsi.lcm_ext_te_monitor ||
+        lcm_params->dsi.lcm_int_te_monitor))
     {
-        return FALSE;
+        return TRUE;
     }
+
+    printk(KERN_INFO "[Y220-DISP] ESD recovery disabled for DBI panel\n");
+    return FALSE;
 }
 
 BOOL DISP_EsdRecover(void)
