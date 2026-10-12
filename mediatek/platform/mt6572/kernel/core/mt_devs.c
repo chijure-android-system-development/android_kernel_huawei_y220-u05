@@ -44,6 +44,10 @@ struct {
 
 int use_bl_fb = 0;
 
+/* Bootloader (LK) framebuffer from the videolfb ATAG, for the boot logo handoff in mtkfb. */
+unsigned int mt_get_bl_fb_base(void) { return bl_fb.base; }
+unsigned int mt_get_bl_fb_size(void) { return bl_fb.size; }
+
 /*=======================================================================*/
 /* MT6589 USB GADGET                                                     */
 /*=======================================================================*/

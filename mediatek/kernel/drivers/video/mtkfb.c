@@ -3587,36 +3587,61 @@ static int mtkfb_fbinfo_modify(struct fb_info *info)
     return r;
 }
 
+extern unsigned int mt_get_bl_fb_base(void);
+extern unsigned int mt_get_bl_fb_size(void);
+
 static void mtkfb_fb_565_to_8888(struct fb_info *fb_info)
 {
+    struct mtkfb_device *fbdev = (struct mtkfb_device *)fb_info->par;
     unsigned int xres = fb_info->var.xres;
     unsigned int yres = fb_info->var.yres;
     unsigned int x_virtual = ALIGN_TO(xres, 32);
     unsigned int fbsize = x_virtual * yres * 2;
+    unsigned int bl_base = mt_get_bl_fb_base();
+    unsigned int bl_size = mt_get_bl_fb_size();
+    unsigned int fb_pa_base = (unsigned int)fbdev->fb_pa_base;
+    unsigned int fb_size = (unsigned int)fbdev->fb_size_in_byte;
     
     unsigned short *s = fb_info->screen_base;
     unsigned int   *d = fb_info->screen_base + fbsize * 2;
+    unsigned int   *tmp, *t;
     unsigned short src_rgb565 = 0;
     int j = 0;
     int k = 0;
 
+    /*
+     * The LK draws the 16 bpp boot logo at its own framebuffer base (videolfb ATAG),
+     * which is not the start of the kernel's larger 32 bpp VRAM. Converting from the
+     * VRAM start showed the previous session's last frame, garbled, until Android
+     * painted. Read the logo from the LK base when it lies inside our VRAM.
+     */
+    if (bl_base >= fb_pa_base && bl_base - fb_pa_base + fbsize <= fb_size)
+        s = (unsigned short *)((char *)fb_info->screen_base + (bl_base - fb_pa_base));
 
+    printk("[MTKFB] boot logo handoff: LK fb 0x%08X size 0x%X, kernel fb 0x%08X size 0x%X, logo offset 0x%X\n",
+           bl_base, bl_size, fb_pa_base, fb_size,
+           (unsigned int)((char *)s - (char *)fb_info->screen_base));
     PRNERR("mtkfb_fb_565_to_8888 xres=%d yres=%d fbsize=0x%X x_virtual=%d s=0x%08X d=0x%08X\n",
                  xres, yres, fbsize, x_virtual, s, d);
     
-    //printf("[boot_logo_updater]normal\n");
+    /* Convert through a scratch buffer so the logo and the 32 bpp page can overlap safely. */
+    tmp = vmalloc(fbsize * 2);
+    t = tmp ? tmp : d;
     for (j = 0; j < yres; ++ j){
         for(k = 0; k < xres; ++ k)
         {
             src_rgb565 = *s++;
-            *d++ = RGB565_TO_ARGB8888(src_rgb565);
+            *t++ = RGB565_TO_ARGB8888(src_rgb565);
         }
         for(k = xres; k < x_virtual; ++ k){
-            *d++ = 0xFFFFFFFF;
-            *s++;
+            *t++ = 0xFFFFFFFF;
+            s++;
         }
     }
-    //printf("[boot_logo_updater] loop copy color over\n");
+    if (tmp) {
+        memcpy(d, tmp, fbsize * 2);
+        vfree(tmp);
+    }
     
     mtkfb_fbinfo_modify(fb_info);
 	wait_event_interruptible_timeout(reg_update_wq, atomic_read(&OverlaySettingApplied), HZ/10);
