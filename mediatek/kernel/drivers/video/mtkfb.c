@@ -1701,8 +1701,10 @@ static int mtkfb_set_overlay_layer(struct fb_info *info, struct fb_overlay_layer
     switch (layerInfo->src_fmt)
     {
     case MTK_FB_FORMAT_YUV422:
-        cached_layer_config[id].fmt = OVL_INPUT_FORMAT_YUYV;
-        eFormat = LCD_LAYER_FORMAT_YUYV422;
+        /* Y220: the stock camera HAL hands the preview to the overlay as Cb Y Cr Y (UYVY),
+         * same order as the GC0329; YUYV here showed a green/magenta preview. */
+        cached_layer_config[id].fmt = OVL_INPUT_FORMAT_UYVY;
+        eFormat = LCD_LAYER_FORMAT_UYVY;
         layerpitch = 2;
         layerbpp = 24;
         break;

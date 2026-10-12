@@ -1087,7 +1087,7 @@ void GC0329_Sensor_Init(void)
 
 	////////////////////out ///////////////////
 
-	GC0329_write_cmos_sensor(0x44 , 0xa0); /* stock: Cb Y Cr Y */
+	GC0329_write_cmos_sensor(0x44 , 0xa0); /* Cb Y Cr Y, same as stock */
 	GC0329_write_cmos_sensor(0xf0 , 0x07);
 	GC0329_write_cmos_sensor(0xf1 , 0x01);
 
@@ -1398,7 +1398,7 @@ UINT32 GC0329GetInfo(MSDK_SCENARIO_ID_ENUM ScenarioId,
     pSensorInfo->SensorWebCamCaptureFrameRate=15;
     pSensorInfo->SensorResetActiveHigh=FALSE;
     pSensorInfo->SensorResetDelayCount=1;
-    pSensorInfo->SensorOutputDataFormat=SENSOR_OUTPUT_FORMAT_YUYV;
+    pSensorInfo->SensorOutputDataFormat=SENSOR_OUTPUT_FORMAT_UYVY; /* must match reg 0x44=0xa0 (Cb Y Cr Y), as stock */
     pSensorInfo->SensorClockPolarity=SENSOR_CLOCK_POLARITY_LOW;
     pSensorInfo->SensorClockFallingPolarity=SENSOR_CLOCK_POLARITY_LOW;
     pSensorInfo->SensorHsyncPolarity = SENSOR_CLOCK_POLARITY_LOW;
