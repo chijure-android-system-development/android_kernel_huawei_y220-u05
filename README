@@ -16,3 +16,105 @@ Linux 3.4.5 kernel for the Huawei Ascend Y220-U05 (HWY220-U).
 ```
 
 Toolchain: `arm-linux-androideabi-4.6`.
+
+## Status
+
+Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#90`, built 12 Oct 2026 and flashed in `boot-y220-k90.img`. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
+
+Every module in `/system/lib/modules/` must be built with the running kernel. A TWRP restore of the stock `/system` puts the 2014 modules back; the kernel loads them (same vermagic, no `MODVERSIONS`) and panics in `mtk_stp_wmt`. Keep the stock ones in `/system/lib/modules/ko-2014/`.
+
+## Changes after #76
+
+Checked on the device with `#90`: modem, SIM, IMEI, calls, SMS, mobile data (Claro needs an APN; the C482 firmware only ships Movistar APNs), WiFi, Bluetooth send and receive, FM radio, loudspeaker, headset with mic detection, voice recorder, camera stills and video with correct colors, deep suspend, zram swap, and power-off charging from the power menu.
+
+- NAND partition table. `partition_define.c` was the donor's eMMC table, so dumchar mapped `/dev/nvram` and friends to nothing and `ccci_plat` failed in `sec_boot_init` opening `/dev/`. It is now the stock NAND layout (18 entries), with MTD names `seccnfg`/`secstatic` and `PART_NUM` 18.
+- zram. `CONFIG_ZSMALLOC` and `CONFIG_ZRAM` are on, and `CONFIG_SLUB_DEBUG_ON` is off, in `mediatek/config/y220/autoconfig/kconfig/project`. The stock `init.rc` creates a 192 MB swap on `zram0`.
+- Kernel log volume went from about 22 lines/s to 1.2 lines/s at idle. Routine per-process, wakelock, battery, keypad, watchdog, PMIC, alarm, WMT and socket messages are `pr_debug` or a higher log level.
+- GC0329 colors. The sensor sends Cb Y Cr Y (`0x44=0xa0`, as stock), so the driver declares `SENSOR_OUTPUT_FORMAT_UYVY` (stock `GetInfo` does the same), and `mtkfb` maps the YUV422 overlay layer to `OVL_INPUT_FORMAT_UYVY`.
+
+Open: the camera preview can freeze on a stale frame alternating with black after reopening the camera, switching to video, or stopping a recording. The MDP RDMA stops answering, the CMDQ thread 0 times out waiting for event `0x14`, and MDP resets do not recover it. Stock does not do this.
+
+Session notes, with logs and disassembly references, are in `~/y220/docs/y220-kernel-port.md`.
+
+Working on `#57`, checked on the device:
+
+- Launcher, capacitive MENU/HOME/BACK, volume-down on GPIO108 as a keypad column. GPIO110 stays the touch line.
+- Loudspeaker and the button LED.
+- GC0329 on I2C bus 0, GPIO87/GPIO88. A still photo is good. Preview colors were not rechecked after the sensor was set back to stock page-0 `0x17=0x14` and `0x44=0xa0` with the overlay in YUYV.
+- KXTJ2-1009 accelerometer, direction 3. Portrait and landscape were confirmed.
+- USB gadget `12d1:2351`, serial `Y220-U05`, adb. Mass storage publishes `lun0` and `lun1` and reports `FUNCTION`/`ENABLED`. The primary card can be unmounted while the second FAT is stacked on `/mnt/sdcard/sdcard2`.
+
+USB storage does not export the card by itself. On `#57` the function is enabled when adb comes up, so the PC sees two 0-byte `File-CD Gadget` disks and the LUN file stays empty. The card remains mounted (`vold` state 4). Opening the "Conectado a USB" notification starts `UsbStorageActivity`, which logs `mSettingUMS=false` and `switchDisplayAsync=false` and never calls `setUsbMassStorageEnabled`. Sharing only happens if that call is made after the function is already enabled.
+
+## Logs on #57
+
+Taken with the phone up, kernel `#57`, `dmesg` already rotated past boot. The ring is mostly `[wlan]` power-state transitions (`[4] -> [1] -> [0] -> [1] -> [4]`).
+
+WiFi is the real failure. The combo chip is up (`wlan0` `50:9f:27:18:c5:97`, WMT thermal read returns `0x25`) and `wpa_supplicant` scans. It tries network id 2, sees `DEPA2` (`c0:51:5c:eb:26:c5`) and `MOVISTAR_BFE6` (`e8:d1:1b:b8:bf:e9`), then `Authentication with <bssid> timed out`, blacklists that BSSID, and scans again. In this capture: 23 `DISCONNECTED`, 19 `CONNECTING`, 0 `CONNECTED`. `wlan0` counters stayed at 0 packets. The driver also logs `EVENT-ROAMING ABORT` and `SEQ NO of AIS SCN DONE MSG is not matched` about every 11 seconds. `netd` cannot write `/proc/sys/net/ipv6/conf/wlan0/disable_ipv6` (no such file); that is logged while the interface is bouncing and is not the association timeout.
+
+Other errors in the same log, not kernel crashes:
+
+- `DhcpUtils`: `Failed to open ra_info_flag` (20 times).
+- `DeviceStorageMonitorService`: `IllegalArgumentException` (11 times).
+- `TelephonyManager`: `getDefaultSim is no sim` (10 times). No SIM was inserted.
+- One `SOFTIRQ DURATION WARN` over 10 ms. `mtk_wdt_restart` lines are the watchdog kick, not a reset.
+
+No oops, no panic, and no I2C NACK in the part of `dmesg` that was still in the buffer.
+
+## WiFi module loading fix
+
+Fixed and verified on 11 Oct 2026 with kernel `#76`. This is a boot ramdisk and `/system` integration issue, not a failure of the combo chip or the WLAN kernel driver.
+
+The initial Android failure was:
+
+```
+insmod: can't open '/system/lib/modules/wlan.ko'
+```
+
+`/system/lib/modules/wlan.ko` was a broken symlink to the absent `wlan_mtk_connsys_mt6572.ko`. The usable module already present in the ROM is `wlan_mt6582.ko`, so the link was corrected to:
+
+```
+/system/lib/modules/wlan.ko -> wlan_mt6582.ko
+```
+
+Loading that module alone then failed with unresolved `cfg80211` symbols. Android's old MediaTek HAL runs `insmod /system/lib/modules/wlan.ko` but does not load its dependency. Preloading both modules manually also gave a misleading failure: the HAL received `File exists` for `wlan.ko`, powered WiFi down through `/dev/wmtWifi`, removed `wlan0`, and timed out waiting for the interface.
+
+The working order is:
+
+1. Load `/system/lib/modules/cfg80211.ko` during `on post-fs-data` in the boot ramdisk's `init.project.rc`.
+2. Leave `wlan.ko` unloaded.
+3. Let the Android HAL power the chip and load `wlan.ko` normally when WiFi is enabled.
+
+The persistent ramdisk addition, immediately before the MTK connectivity modules, is:
+
+```
+    insmod /system/lib/modules/cfg80211.ko
+```
+
+The resulting image is `/home/chijure/y220/boot-y220-wifi.img`. It retains the MediaTek 512-byte `ROOTFS` header on the ramdisk and the 512-byte `KERNEL` header on the kernel payload.
+
+Verified after a clean reboot:
+
+- `cfg80211` is loaded and referenced by `wlan_mt6582`.
+- `wlan0` exists, is `UP`, and keeps MAC `50:9f:27:18:c5:97`.
+- `wlan.driver.status=ok`.
+- `init.svc.wpa_supplicant=running`.
+- Scan results are returned for nearby networks.
+
+This fixes driver startup. Authentication timeouts described in the older `#57` log above are a separate network/configuration issue.
+
+## Power-off charging
+
+Charging mode is not in recovery. The stock recovery ramdisk only starts `ueventd`, `recovery` and `adbd`. It has no `ipod` and no `init.charging.rc`.
+
+`MTK_KERNEL_POWER_OFF_CHARGING=yes` in the Y220 project config. The LK board header turns that into `CFG_POWER_CHARGING`. With the phone off, the LK sees the charger and boots the boot partition with mode `8` (`KERNEL_POWER_OFF_CHARGING_BOOT` in `mt_boot.h`). Mode `9` is low-power charging. The value arrives in the kernel through the ATAG (`mt_fixup.c`) and is published at `/sys/class/BOOT/BOOT/boot/boot_mode` and `/proc/boot_mode`. Normal boot is `0`.
+
+The stock `init` in the boot ramdisk reads that number. Mode `8` or `9` parses `init.charging.rc` instead of `init.rc`. That script starts class `ipo`, which runs `/system/bin/ipod` (`libipod.so`). `ipod` draws the battery on the boot-logo framebuffer (`bootlogo_show_charging`, `mt65xx_disp_show_battery_capacity`). A factory reset of `/data` does not remove it. Wiping `/system` would.
+
+The `#57` image examined at that stage (`boot-y220-ums4.img`) carried the stock ramdisk. `init.charging.rc` was in it, and its ROOTFS payload was the same 612053 bytes as stock. Replacing recovery with TWRP does not remove this path. The currently flashed `#76` image retains that ramdisk with only the WiFi dependency addition documented above.
+
+Checked 9 Oct 2026 with the USB cable plugged in. The panel showed the Movistar logo, then a yellow striped frame, and Android came up. `/proc/boot_mode` was `NORMAL BOOT` and the sysfs value was `0`. `ipod` did not run. The stripes are the handoff after the logo: LK draws it at 16 bpp (`CFG_DISPLAY_BPP` in the LK board header) and the kernel framebuffer is 32 bpp. The same stripes show on a normal boot and when entering recovery, until Android or TWRP paints. They are not the charging animation.
+
+To enter charging, power off, unplug, wait until the panel is off, then plug the charger without pressing power. `power_off.c` in the LK, if the charger is already connected at shutdown, calls `mtk_arch_reset(0)` without `rtc_mark_kpoc()`. That comes back as a normal boot: logo, stripes, Android.
+
+Checked 12 Oct 2026 with `#90`: powering off from the power menu with the charger already connected stays on the charging animation and Android does not come up (adb does not enumerate). `adb shell reboot -p` is not equivalent: it goes straight to `mt_power_off()`, which calls `arch_reset(0, "power_off_with_charger")`. That command is not in the `arch_reset()` list, so it is a normal reboot (`boot_reason=4`) into Android. The stock `arch_reset` is identical.
