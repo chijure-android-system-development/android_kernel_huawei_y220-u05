@@ -37,6 +37,8 @@ Checked on the device with `#90`–`#92`: modem, SIM, IMEI, calls, SMS, mobile d
 
 CMDQ thread timeouts (`Wait CMDQ interrupt time out`, RDMA failures) were seen once in video mode on `#88`. They were not present when the freeze reproduced on `#91`, so they are not its cause; recheck video recording on `#92`.
 
+TWRP runs the same `#92` kernel: `recovery-twrp-k92.img` is the installed TWRP ramdisk (unchanged, `cmdline androidboot.hardware=mt6572`) with the `#92` kernel, 38 KB under the 6 MB recovery partition. Checked: UBI attaches mtd14/16/15, `/system`, `/data`, `/cache` and the microSD mount, display and touch work. Early boot is fully in `dmesg` there and confirms the logo handoff: `BOOTLD: start 0x8fe00000, size 2097152`, `KERNEL: start 0x8fd00000, size 3145728`, logo offset `0x100000`.
+
 Session notes, with logs and disassembly references, are in `~/y220/docs/y220-kernel-port.md`.
 
 Working on `#57`, checked on the device:
