@@ -110,8 +110,13 @@ static int p_point_num = 0;
 //  .address_data = &addr_data,
  };
  //start for update firmware //msz   for update firmware 20121126
-#define __FIRMWARE_UPDATE__
-#define MSG2133_UPDATE
+/*
+ * Off, as in the stock Y220 kernel: the update interface is a world-writable
+ * class (ms-touchscreen-msg20xx, mode 0777) that lets any app reflash the
+ * MSG2133 firmware.
+ */
+//#define __FIRMWARE_UPDATE__
+//#define MSG2133_UPDATE
 
 //#ifdef MSG2133_UPDATE
 #ifdef __FIRMWARE_UPDATE__
@@ -2150,7 +2155,9 @@ void msg2133_init_class()
 
 	i2c_client = client;
 	//msg21xx_i2c_client = client;
+#ifdef __FIRMWARE_UPDATE__
 	this_client = client;
+#endif
 	/*reset I2C clock*/
     //i2c_client->timing = 0;
     

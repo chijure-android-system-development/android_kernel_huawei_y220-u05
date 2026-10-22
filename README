@@ -19,9 +19,13 @@ Toolchain: `arm-linux-androideabi-4.6`.
 
 ## Status
 
-Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#93`, built 22 Oct 2026 (CM7 boot with the `#93` kernel; the previous CM7 boot is `boot-cm7-k92-before-k93-20261022.img`). `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
+Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#94`, built 22 Oct 2026. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
 
 Every module in `/system/lib/modules/` must be built with the running kernel. A TWRP restore of the stock `/system` puts the 2014 modules back; the kernel loads them (same vermagic, no `MODVERSIONS`) and panics in `mtk_stp_wmt`. Keep the stock ones in `/system/lib/modules/ko-2014/`.
+
+## Touch firmware interface off (#94)
+
+The donor msg2133 driver created `ms-touchscreen-msg20xx` with `version`, `update`, `data` and `clear` at mode 0777, so any app could reflash the MSG2133 firmware. The stock kernel has no such interface. `__FIRMWARE_UPDATE__` is now off; touch reporting is unchanged.
 
 ## Netfilter (#93)
 
