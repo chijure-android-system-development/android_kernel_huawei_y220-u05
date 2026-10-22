@@ -19,9 +19,13 @@ Toolchain: `arm-linux-androideabi-4.6`.
 
 ## Status
 
-Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#92`, built 12 Oct 2026 and flashed in `boot-y220-k92.img`. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
+Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#93`, built 22 Oct 2026 (CM7 boot with the `#93` kernel; the previous CM7 boot is `boot-cm7-k92-before-k93-20261022.img`). `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
 
 Every module in `/system/lib/modules/` must be built with the running kernel. A TWRP restore of the stock `/system` puts the 2014 modules back; the kernel loads them (same vermagic, no `MODVERSIONS`) and panics in `mtk_stp_wmt`. Keep the stock ones in `/system/lib/modules/ko-2014/`.
+
+## Netfilter (#93)
+
+`# CONFIG_NETFILTER is not set` came from the donor project config, so there was no `nat` table and USB tethering could not NAT. The stock kernel has `ip_tables`, `iptable_nat`, `nf_conntrack` and `MASQUERADE`. The line is gone and the MT6572 platform netfilter set applies. `CONFIG_NETFILTER_XT_MATCH_QTAGUID` is off: it is ICS+ only, and without IPv6 it fails to build (`ipv6_find_hdr`). Netfilter changes `struct sk_buff`, so every module was rebuilt with `#93`. Checked on the device: USB tethering over `ccmni0` with MASQUERADE.
 
 ## Changes after #76
 
