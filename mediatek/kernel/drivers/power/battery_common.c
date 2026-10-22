@@ -46,7 +46,6 @@
 #include <linux/proc_fs.h>
 #include <linux/platform_device.h>
 #include <linux/xlog.h>
-#include <linux/timer.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -81,15 +80,6 @@ char proc_bat_data[32];
 //// Smart Battery Structure
 ///////////////////////////////////////////////////////////////////////////////////////////
 PMU_ChargerStruct BMT_status;
-
-/* Temporary KPOC snapshot: force ipanic just before the observed watchdog. */
-static struct timer_list y220_kpoc_snapshot_timer;
-static kal_bool y220_kpoc_snapshot_armed;
-
-static void y220_kpoc_snapshot(unsigned long unused)
-{
-	panic("Y220-KPOC snapshot 4200ms after first BAT_thread");
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -2098,17 +2088,6 @@ void BAT_thread(void)
    	}
 	
 	mt_battery_update_status();
-
-	if (!y220_kpoc_snapshot_armed &&
-	    (g_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
-	     g_boot_mode == LOW_POWER_OFF_CHARGING_BOOT)) {
-		y220_kpoc_snapshot_armed = KAL_TRUE;
-		init_timer(&y220_kpoc_snapshot_timer);
-		y220_kpoc_snapshot_timer.function = y220_kpoc_snapshot;
-		y220_kpoc_snapshot_timer.expires =
-			jiffies + msecs_to_jiffies(4200);
-		add_timer(&y220_kpoc_snapshot_timer);
-	}
 
 }
 

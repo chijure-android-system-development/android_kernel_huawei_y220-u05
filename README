@@ -19,9 +19,13 @@ Toolchain: `arm-linux-androideabi-4.6`.
 
 ## Status
 
-Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#94`, built 22 Oct 2026. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
+Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY220-U05/C482B206SP05`. Running kernel is `#95`, built 22 Oct 2026. `#58` did not enumerate on USB and was reverted in the tree. Do not flash the C464 package. Do not use SP Flash Tool v6, and do not Format All.
 
 Every module in `/system/lib/modules/` must be built with the running kernel. A TWRP restore of the stock `/system` puts the 2014 modules back; the kernel loads them (same vermagic, no `MODVERSIONS`) and panics in `mtk_stp_wmt`. Keep the stock ones in `/system/lib/modules/ko-2014/`.
+
+## Power-off charging hang fixed (#95)
+
+`2d98770d` (log quieting) also committed a temporary KPOC probe in `battery_common.c`: a timer that called `panic()` 4.2 s after the first `BAT_thread` to dump the RAM console. From timer context the panic restart ran `ioremap` in `wdt_arch_reset` and the kernel hung with the charging frame on screen, so the power key could never reach `ipod`. #92-#94 carry it. It is gone in #95. Checked: charging mode stays up (105 s, suspends), and holding power makes `ipod` call `reboot` into Android.
 
 ## Touch firmware interface off (#94)
 
