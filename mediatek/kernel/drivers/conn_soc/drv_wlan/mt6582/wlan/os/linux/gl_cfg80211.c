@@ -366,9 +366,11 @@ mtk_cfg80211_set_default_key (
     printk("--> %s()\n", __func__);
 #endif
 
-    /* not implemented */
-
-    return -EINVAL;
+    /* Nothing to do: add_key already marks a pairwise key as the transmit
+     * key (BIT(31)) and the firmware uses it. wpa_supplicant_8 (Android
+     * 4.2+) sends SET_KEY default after every pairwise key over nl80211;
+     * -EINVAL here failed every WPA/WPA2 handshake ("Failed to set PTK"). */
+    return 0;
 }
 
 

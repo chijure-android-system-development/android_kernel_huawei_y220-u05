@@ -23,6 +23,10 @@ Phone under test: Y220-U05, fingerprint `HUAWEI/Y220-U05/HWY220-U:2.3.6/HUAWEIY2
 
 Every module in `/system/lib/modules/` must be built with the running kernel. A TWRP restore of the stock `/system` puts the 2014 modules back; the kernel loads them (same vermagic, no `MODVERSIONS`) and panics in `mtk_stp_wmt`. Keep the stock ones in `/system/lib/modules/ko-2014/`.
 
+## WiFi WPA with wpa_supplicant 8 (wlan_mt6582.ko, kernel stays #95)
+
+`mtk_cfg80211_set_default_key()` in `gl_cfg80211.c` was a stub that returned `-EINVAL`. `wpa_supplicant` 8 (Android 4.2 and later, used by the CM10.1 port) talks nl80211 and sends `SET_KEY` default after every pairwise key, so every WPA/WPA2 connection dropped right after the 4-way handshake with "Failed to set PTK to the driver". `add_key` already marks a pairwise key as the transmit key (`BIT(31)`), so the call now returns 0. The GB builds (CM7, stock) use WEXT and never call it. Only the module changes; build it alone with `KMOD_PATH=mediatek/kernel/drivers/conn_soc/drv_wlan/mt6582/wlan ./build.sh y220` and the same `arm-linux-androideabi-4.6` toolchain as `#95` (same vermagic). Checked on the device on CM10.1: WPA2-PSK/CCMP connects, DHCP, internet.
+
 ## Power-off charging hang fixed (#95)
 
 `2d98770d` (log quieting) also committed a temporary KPOC probe in `battery_common.c`: a timer that called `panic()` 4.2 s after the first `BAT_thread` to dump the RAM console. From timer context the panic restart ran `ioremap` in `wdt_arch_reset` and the kernel hung with the charging frame on screen, so the power key could never reach `ipod`. #92-#94 carry it. It is gone in #95. Checked: charging mode stays up (105 s, suspends), and holding power makes `ipod` call `reboot` into Android.
