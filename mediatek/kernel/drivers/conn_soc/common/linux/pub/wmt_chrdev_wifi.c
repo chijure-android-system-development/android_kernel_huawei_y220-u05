@@ -43,6 +43,22 @@ static struct cdev WIFI_cdev;
 volatile int retflag = 0;
 static struct semaphore wr_mtx;
 
+/*
+ * Android 4.2 netd writes the firmware "path" for a mode here
+ * (WIFI_DRIVER_FW_PATH_PARAM): "AP" before hostapd, "STA" after it. The
+ * WLAN driver registers the function that switches its AP net device on
+ * and off.
+ */
+static int (*wlan_set_ap_mode)(int enable);
+
+void mtk_wcn_wlan_register_ap_mode(int (*set_ap_mode)(int enable))
+{
+    down(&wr_mtx);
+    wlan_set_ap_mode = set_ap_mode;
+    up(&wr_mtx);
+}
+EXPORT_SYMBOL(mtk_wcn_wlan_register_ap_mode);
+
 static int WIFI_open(struct inode *inode, struct file *file)
 {
     WIFI_INFO_FUNC("%s: major %d minor %d (pid %d)\n", __func__,
@@ -102,6 +118,22 @@ ssize_t WIFI_write(struct file *filp, const char __user *buf, size_t count, loff
                     opened = 1;
                     retval = count;
                     WIFI_INFO_FUNC("WMT turn on WIFI success!\n");
+                }
+            }
+            else if (local[0] == 'A' || local[0] == 'S' || local[0] == 'P') {
+                /* "AP", "STA", "P2P": only AP has its own net device. */
+                int enable = (local[0] == 'A');
+
+                if (wlan_set_ap_mode == NULL) {
+                    WIFI_WARN_FUNC("no WLAN driver for mode %c\n", local[0]);
+                    retval = -ENODEV;
+                }
+                else if ((retval = wlan_set_ap_mode(enable)) == 0) {
+                    WIFI_INFO_FUNC("WLAN AP mode %s\n", enable ? "on" : "off");
+                    retval = count;
+                }
+                else {
+                    WIFI_WARN_FUNC("WLAN AP mode %s failed: %d\n", enable ? "on" : "off", retval);
                 }
             }
 

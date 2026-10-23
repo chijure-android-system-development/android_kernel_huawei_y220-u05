@@ -2593,6 +2593,96 @@ extern void wlanUnregisterNotifier(void);
 * \retval negative value Failed
 */
 /*----------------------------------------------------------------------------*/
+#if CFG_ENABLE_WIFI_DIRECT
+/* The station net device while the chip is on; set by wlanProbe. */
+static struct net_device *gPrStaDev;
+
+extern void mtk_wcn_wlan_register_ap_mode(int (*set_ap_mode)(int enable));
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief Turns the soft AP net device on or off for the wmt_wifi char device
+*        ("AP"/"STA" from Android's netd).
+*
+*        Android 4.2 runs hostapd and the tethering on wifi.interface, wlan0,
+*        while this driver's AP is a second net device. The station device
+*        is renamed sta0 and the AP registered as wlan0; off undoes it.
+*
+* \retval 0 or a negative errno
+*/
+/*----------------------------------------------------------------------------*/
+static int
+wlanSetApMode (int enable)
+{
+    struct net_device *prDev = gPrStaDev;
+    P_GLUE_INFO_T prGlueInfo;
+    PARAM_CUSTOM_P2P_SET_STRUC_T rSetP2P;
+    UINT_32 u4BufLen = 0;
+    int ret = 0;
+
+    if (prDev == NULL || g_u4HaltFlag) {
+        return -ENODEV;
+    }
+    prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
+    if (prGlueInfo == NULL) {
+        return -ENODEV;
+    }
+
+    if (enable) {
+        if (prGlueInfo->prAdapter->fgIsP2PRegistered) {
+            return 0;
+        }
+
+        rtnl_lock();
+        dev_close(prDev);
+        ret = dev_change_name(prDev, "sta%d");
+        rtnl_unlock();
+        if (ret < 0) {
+            printk(KERN_WARNING DRV_NAME "AP mode: cannot rename %s: %d\n", prDev->name, ret);
+            return ret;
+        }
+
+        /* wlanoidSetP2pMode returns an uninitialized status (the private
+         * ioctl ignores it too); fgIsP2PRegistered tells if it worked. */
+        rSetP2P.u4Enable = 1;
+        rSetP2P.u4Mode = 1;
+        kalIoctl(prGlueInfo, wlanoidSetP2pMode, &rSetP2P, sizeof(rSetP2P),
+            FALSE, FALSE, TRUE, FALSE, &u4BufLen);
+        if (!prGlueInfo->prAdapter->fgIsP2PRegistered ||
+            !p2pNetRegister(prGlueInfo, FALSE)) {
+            printk(KERN_WARNING DRV_NAME "AP mode: cannot start the AP device\n");
+            ret = -EIO;
+            enable = 0;
+        }
+        else {
+            printk(KERN_INFO DRV_NAME "AP mode on: %s, station %s\n",
+                prGlueInfo->prP2PInfo->prDevHandler->name, prDev->name);
+            return 0;
+        }
+    }
+
+    /* Off, or undo a failed on. */
+    if (prGlueInfo->prAdapter->fgIsP2PRegistered) {
+        p2pNetUnregister(prGlueInfo, FALSE);
+        rSetP2P.u4Enable = 0;
+        rSetP2P.u4Mode = 0;
+        kalIoctl(prGlueInfo, wlanoidSetP2pMode, &rSetP2P, sizeof(rSetP2P),
+            FALSE, FALSE, TRUE, FALSE, &u4BufLen);
+    }
+    if (strcmp(prDev->name, "wlan0") != 0) {
+        int err;
+
+        rtnl_lock();
+        err = dev_change_name(prDev, "wlan0");
+        rtnl_unlock();
+        if (err < 0) {
+            printk(KERN_WARNING DRV_NAME "AP mode off: cannot rename %s back: %d\n", prDev->name, err);
+        }
+    }
+    return ret;
+}
+#endif
+
 static INT_32
 wlanProbe(
     PVOID pvData
@@ -2662,6 +2752,9 @@ wlanProbe(
         //4 <2.5> Set the ioaddr to HIF Info
         prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(prWdev->wiphy);
         gPrDev = prGlueInfo->prDevHandler;
+#if CFG_ENABLE_WIFI_DIRECT
+        gPrStaDev = prGlueInfo->prDevHandler;
+#endif
         glSetHifInfo(prGlueInfo, (UINT_32) pvData);
 
         KAL_WAKE_LOCK_INIT(prAdapter, &prGlueInfo->rAhbIsrWakeLock, "WLAN AHB ISR");
@@ -2883,6 +2976,10 @@ wlanRemove(
 
     DBGLOG(INIT, INFO, ("Remove wlan!\n"));
 
+#if CFG_ENABLE_WIFI_DIRECT
+    gPrStaDev = NULL;
+#endif
+
 
     //4 <0> Sanity check
     ASSERT(u4WlanDevNum <= CFG_MAX_WLAN_DEVICES);
@@ -3043,6 +3140,10 @@ static int __init initWlan(void)
     glResetInit();
 #endif
 
+#if CFG_ENABLE_WIFI_DIRECT
+    mtk_wcn_wlan_register_ap_mode(wlanSetApMode);
+#endif
+
     return ret;
 } /* end of initWlan() */
 
@@ -3060,6 +3161,9 @@ static int __init initWlan(void)
 static VOID __exit exitWlan(void)
 {
     //printk("remove %p\n", wlanRemove);
+#if CFG_ENABLE_WIFI_DIRECT
+    mtk_wcn_wlan_register_ap_mode(NULL);
+#endif
 #if CFG_CHIP_RESET_SUPPORT
     glResetUninit();
 #endif

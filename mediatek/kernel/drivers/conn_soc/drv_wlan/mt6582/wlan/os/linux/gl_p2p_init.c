@@ -30,7 +30,10 @@
 */
 
 #define P2P_MODE_INF_NAME "p2p%d";
-#define AP_MODE_INF_NAME "ap%d";
+/* The station device moves to sta0 while the AP is up (wlanSetApMode in
+ * gl_init.c), so the AP gets wlan0: Android 4.2 runs hostapd and the
+ * tethering on wifi.interface. */
+#define AP_MODE_INF_NAME "wlan%d";
 //#define MAX_INF_NAME_LEN 15
 //#define MIN_INF_NAME_LEN 1
 

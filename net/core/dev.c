@@ -1045,6 +1045,8 @@ rollback:
 
 	return err;
 }
+/* The MT6582 WLAN module renames its station device for soft AP mode. */
+EXPORT_SYMBOL(dev_change_name);
 
 /**
  *	dev_set_alias - change ifalias of a device
