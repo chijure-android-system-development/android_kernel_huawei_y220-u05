@@ -39,6 +39,8 @@ The donor msg2133 driver created `ms-touchscreen-msg20xx` with `version`, `updat
 
 `# CONFIG_NETFILTER is not set` came from the donor project config, so there was no `nat` table and USB tethering could not NAT. The stock kernel has `ip_tables`, `iptable_nat`, `nf_conntrack` and `MASQUERADE`. The line is gone and the MT6572 platform netfilter set applies. `CONFIG_NETFILTER_XT_MATCH_QTAGUID` is off: it is ICS+ only, and without IPv6 it fails to build (`ipv6_find_hdr`). Netfilter changes `struct sk_buff`, so every module was rebuilt with `#93`. Checked on the device: USB tethering over `ccmni0` with MASQUERADE.
 
+`# CONFIG_IPV6 is not set` also came from the project config. Android 4.2 (CM10.1) needs IPv6: libcore's `NetworkInterface` reads `/proc/net/if_inet6`, and without it `getByName()` throws `SocketException`. `NetworkManagementService.enableNat()` calls it, so USB tethering on CM10.1 failed with `TETHER_ERROR_ENABLE_NAT_ERROR` before netd was asked. The line is gone and the MT6572 platform IPv6 set applies (`#96`, zImage +181 KB, boot image still 1.6 MB under the partition). `QTAGUID` stays off. All modules were rebuilt with `#96`. Checked on the device: CM10.1 USB tethering, the PC browses over `ccmni0`. GB (CM7, stock) works with or without IPv6.
+
 ## Changes after #76
 
 Checked on the device with `#90`–`#92`: modem, SIM, IMEI, calls, SMS, mobile data (Claro needs an APN; the C482 firmware only ships Movistar APNs), WiFi, Bluetooth send and receive, FM radio, loudspeaker, headset with mic detection, voice recorder, camera stills and video with correct colors, deep suspend, zram swap, and power-off charging from the power menu.
